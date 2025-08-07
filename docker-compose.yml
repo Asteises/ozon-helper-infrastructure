@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16.9-alpine
+    container_name: ozon-helper-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ozon-network
+
+  backend:
+    image: ozon-helper-app:latest
+    container_name: ozon-helper-app
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      ENCRYPT_PASSWORD: ${ENCRYPT_PASSWORD}
+      ENCRYPT_SALT: ${ENCRYPT_SALT}
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:1212/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - backend_logs:/app/logs
+    ports:
+      - "1212:1212"
+    depends_on:
+      - postgres
+    networks:
+      - ozon-network
+
+  frontend:
+    image: ozon-helper-frontend:latest
+    container_name: ozon-helper-frontend
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - frontend_logs:/app/logs
+    networks:
+      - ozon-network
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  app_logs:
+  frontend_dist:
+
+networks:
+  ozon-network:
+    driver: bridge
