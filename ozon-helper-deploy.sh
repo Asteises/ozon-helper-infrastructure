@@ -22,7 +22,7 @@ BACKEND_DIR="${APP_ROOT}/backend"
 FRONTEND_DIR="${APP_ROOT}/frontend"
 COMPOSE_FILE="${APP_ROOT}/docker-compose.yml"
 
-IMAGE_NAME="ozon-helper-app"
+IMAGE_NAME="ozon-helper-backend"
 FRONTEND_IMAGE_NAME="ozon-helper-frontend"
 
 DATE_TAG=$(date +'%Y%m%d%H%M%S')
@@ -45,21 +45,23 @@ echo "=============================="
 ### 3. Обновляем backend
 ### ================================
 
-if [ ! -d "$BACKEND_DIR" ]; then
-  echo "[BACKEND] Клонируем $BACKEND_REPO_URL в $BACKEND_DIR..."
-  git clone -b "$BRANCH" "$BACKEND_REPO_URL" "$BACKEND_DIR"
-else
-  echo "[BACKEND] Обновляем репозиторий..."
-  cd "$BACKEND_DIR"
-  git fetch origin
-  git reset --hard origin/$BRANCH
-fi
+cd "$BACKEND_DIR"
 
-cd $APP_DIR
+echo "[BACKEND] Собираем Docker-образ: $FULL_TAG"
+docker build -t "$FULL_TAG" .
+
+echo "[BACKEND] Обновляем тег в docker-compose.yml"
+sed -i "s|image: ${IMAGE_NAME}:.*|image: ${FULL_TAG}|g" "$COMPOSE_FILE"
+
+echo "[BACKEND] Перезапускаем контейнер..."
+docker-compose -f "$COMPOSE_FILE" stop backend
+docker-compose -f "$COMPOSE_FILE" up -d backend
 
 ### ================================
 ### 4. Обновляем frontend
 ### ================================
+
+cd "$FRONTEND_DIR"
 
 if [ ! -d "$FRONTEND_DIR" ]; then
   echo "[FRONTEND] Клонируем $FRONTEND_REPO_URL в $FRONTEND_DIR..."

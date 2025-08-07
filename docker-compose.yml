@@ -20,8 +20,8 @@ services:
       - ozon-network
 
   backend:
-    image: ozon-helper-app:latest
-    container_name: ozon-helper-app
+    image: ozon-helper-backend:latest
+    container_name: ozon-helper-backend
     restart: unless-stopped
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -50,9 +50,6 @@ services:
     image: ozon-helper-frontend:latest
     container_name: ozon-helper-frontend
     restart: unless-stopped
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     ports:
       - "5173:5173"
     volumes:
