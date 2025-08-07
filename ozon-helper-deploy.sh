@@ -102,8 +102,8 @@ echo "[BACKEND] Обновляем тег в docker-compose.yml"
 sed -i "s|image: ${IMAGE_NAME}:.*|image: ${FULL_TAG}|g" "$COMPOSE_FILE"
 
 echo "[BACKEND] Перезапускаем контейнер..."
-docker-compose -f "$COMPOSE_FILE" stop app
-docker-compose -f "$COMPOSE_FILE" up -d app
+docker-compose -f "$COMPOSE_FILE" stop backend
+docker-compose -f "$COMPOSE_FILE" up -d backend
 
 ### ================================
 ### 7. Очистка старых образов
