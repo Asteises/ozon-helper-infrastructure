@@ -9,37 +9,48 @@ set -e
 BRANCH="${1:-master}"
 CLEAN_IMAGES="${2:-yes}"
 
-### 1. Настройки
-APP_NAME="ozon-helper"
-APP_DIR="/opt/ozon-helper"
-REPO_URL="https://github.com/Asteises/ozon-helper-v.2.git"
+### ================================
+### 1. Настройки путей и репозиториев
+### ================================
+
+APP_ROOT="/opt/ozon-helper"
+
+BACKEND_REPO_URL="https://github.com/Asteises/ozon-helper-backend.git"
+FRONTEND_REPO_URL="https://github.com/Asteises/ozon-helper-frontend.git"
+
+BACKEND_DIR="${APP_ROOT}/backend"
+FRONTEND_DIR="${APP_ROOT}/frontend"
+COMPOSE_FILE="${APP_ROOT}/docker-compose.yml"
 
 IMAGE_NAME="ozon-helper-app"
 FRONTEND_IMAGE_NAME="ozon-helper-frontend"
 
-DATE_TAG=$(date +'%Y%m%d%H%M%S')  # уникальный тег по времени
+DATE_TAG=$(date +'%Y%m%d%H%M%S')
 FULL_TAG="${IMAGE_NAME}:${DATE_TAG}"
 FRONTEND_TAG="${FRONTEND_IMAGE_NAME}:${DATE_TAG}"
 
-COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
-FRONTEND_DIR="${APP_DIR}/frontend"
-NGINX_FRONTEND_DIST="/var/www/ozon-helper/frontend/dist"
-
+### ================================
 ### 2. Логирование
+### ================================
+
 echo "=============================="
 echo "DEPLOY START: $(date)"
 echo "Branch: $BRANCH"
-echo "Image tag: $FULL_TAG"
+echo "Backend tag: $FULL_TAG"
+echo "Frontend tag: $FRONTEND_TAG"
 echo "Clean old images: $CLEAN_IMAGES"
 echo "=============================="
 
-### 3. Обновляем код
-if [ ! -d "$APP_DIR" ]; then
-  echo "[INFO] Клонируем репозиторий $REPO_URL (ветка $BRANCH) ..."
-  git clone -b $BRANCH $REPO_URL $APP_DIR
+### ================================
+### 3. Обновляем backend
+### ================================
+
+if [ ! -d "$BACKEND_DIR" ]; then
+  echo "[BACKEND] Клонируем $BACKEND_REPO_URL в $BACKEND_DIR..."
+  git clone -b "$BRANCH" "$BACKEND_REPO_URL" "$BACKEND_DIR"
 else
-  echo "[INFO] Обновляем репозиторий (ветка $BRANCH) ..."
-  cd $APP_DIR
+  echo "[BACKEND] Обновляем репозиторий..."
+  cd "$BACKEND_DIR"
   git fetch origin
   git reset --hard origin/$BRANCH
 fi
@@ -47,78 +58,61 @@ fi
 cd $APP_DIR
 
 ### ================================
-### 4. Сборка frontend
+### 4. Обновляем frontend
 ### ================================
 
-echo "[FRONTEND] Собираем Docker-образ: $FRONTEND_TAG"
-docker build -t $FRONTEND_TAG ./frontend
-
-echo "[FRONTEND] Обновляем тег образа в docker-compose.yml"
-sed -i "s|image: ${FRONTEND_IMAGE_NAME}:.*|image: ${FRONTEND_TAG}|g" $COMPOSE_FILE
-
-echo "[FRONTEND] Перезапускаем контейнер фронта..."
-docker-compose -f $COMPOSE_FILE stop frontend
-docker-compose -f $COMPOSE_FILE up -d frontend
-
-### ================================
-### 5. Сборка backend
-### ================================
-
-cd $APP_DIR
-
-echo "[INFO] Собираем новый Docker image: $FULL_TAG"
-docker build -t $FULL_TAG .
-
-echo "[INFO] Обновляем тег образа в docker-compose.yml"
-sed -i "s|image: ${IMAGE_NAME}:.*|image: ${FULL_TAG}|g" $COMPOSE_FILE
-
-echo "[INFO] Останавливаем контейнер приложения..."
-docker-compose -f $COMPOSE_FILE stop app
-
-echo "[INFO] Запускаем контейнер приложения с новым образом..."
-docker-compose -f $COMPOSE_FILE up -d app
-
-### ================================
-### 6. Очистка старых образов backend
-### ================================
-
-if [ "$CLEAN_IMAGES" = "yes" ]; then
-  echo "[INFO] Очистка старых образов backend (оставляем 5 последних)..."
-  ALL_IMAGES=$(docker images "$IMAGE_NAME" --format "{{.Repository}}:{{.Tag}}" | sort -r)
-  COUNT=$(echo "$ALL_IMAGES" | wc -l)
-  echo "[INFO] Найдено $COUNT образов для $IMAGE_NAME"
-
-  if [ "$COUNT" -gt 5 ]; then
-    OLD_IMAGES=$(echo "$ALL_IMAGES" | tail -n +6)
-    echo "[INFO] Будут удалены следующие образы backend:"
-    echo "$OLD_IMAGES"
-    echo "$OLD_IMAGES" | xargs -r docker rmi
-  else
-echo "[INFO] Удаление не требуется — меньше 5 образов backend"
-  fi
+if [ ! -d "$FRONTEND_DIR" ]; then
+  echo "[FRONTEND] Клонируем $FRONTEND_REPO_URL в $FRONTEND_DIR..."
+  git clone -b "$BRANCH" "$FRONTEND_REPO_URL" "$FRONTEND_DIR"
 else
-  echo "[INFO] Очистка старых образов backend пропущена (параметр clean-images = no)"
+  echo "[FRONTEND] Обновляем репозиторий..."
+  cd "$FRONTEND_DIR"
+  git fetch origin
+  git reset --hard origin/$BRANCH
 fi
 
 ### ================================
-### 7. Очистка старых образов frontend
+### 5. Сборка frontend
+### ================================
+
+cd "$FRONTEND_DIR"
+
+echo "[FRONTEND] Собираем Docker-образ: $FRONTEND_TAG"
+docker build -t "$FRONTEND_TAG" .
+
+echo "[FRONTEND] Обновляем тег в docker-compose.yml"
+sed -i "s|image: ${FRONTEND_IMAGE_NAME}:.*|image: ${FRONTEND_TAG}|g" "$COMPOSE_FILE"
+
+echo "[FRONTEND] Перезапускаем контейнер..."
+docker-compose -f "$COMPOSE_FILE" stop frontend
+docker-compose -f "$COMPOSE_FILE" up -d frontend
+
+### ================================
+### 6. Сборка backend
+### ================================
+
+cd "$BACKEND_DIR"
+
+echo "[BACKEND] Собираем Docker-образ: $FULL_TAG"
+docker build -t "$FULL_TAG" .
+
+echo "[BACKEND] Обновляем тег в docker-compose.yml"
+sed -i "s|image: ${IMAGE_NAME}:.*|image: ${FULL_TAG}|g" "$COMPOSE_FILE"
+
+echo "[BACKEND] Перезапускаем контейнер..."
+docker-compose -f "$COMPOSE_FILE" stop app
+docker-compose -f "$COMPOSE_FILE" up -d app
+
+### ================================
+### 7. Очистка старых образов
 ### ================================
 
 if [ "$CLEAN_IMAGES" = "yes" ]; then
-  echo "[INFO] Очистка старых образов frontend (оставляем 5 последних)..."
-  ALL_FRONT_IMAGES=$(docker images "$FRONTEND_IMAGE_NAME" --format "{{.Repository}}:{{.Tag}}" | sort -r)
-  COUNT_FRONT=$(echo "$ALL_FRONT_IMAGES" | wc -l)
-  echo "[INFO] Найдено $COUNT образов для $IMAGE_NAME"
+  echo "[CLEANUP] Очистка старых образов backend..."
+  docker images "$IMAGE_NAME" --format "{{.Repository}}:{{.Tag}}" | sort -r | tail -n +6 | xargs -r docker rmi
 
-  if [ "$COUNT_FRONT" -gt 5 ]; then
-  OLD_FRONT_IMAGES=$(echo "$ALL_FRONT_IMAGES" | tail -n +6)
-  echo "[INFO] Удаление старых образов фронта:"
-  echo "$OLD_FRONT_IMAGES" | xargs -r docker rmi
-  else
-echo "[INFO] Удаление не требуется — меньше 5 образов фронта"
-  fi
-else
-  echo "[INFO] Очистка старых образов фронта пропущена (параметр clean-images = no)"
+  echo "[CLEANUP] Очистка старых образов frontend..."
+  docker images "$FRONTEND_IMAGE_NAME" --format "{{.Repository}}:{{.Tag}}" | sort -r | tail -n +6 | xargs -r docker rmi
 fi
 
 echo "=============================="
