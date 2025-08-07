@@ -46,27 +46,9 @@ services:
     networks:
       - ozon-network
 
-  frontend:
-    image: ozon-helper-frontend:latest
-    container_name: ozon-helper-frontend
-    restart: unless-stopped
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "5173:5173"
-    volumes:
-      - frontend_logs:/app/logs
-    networks:
-      - ozon-network
-    depends_on:
-      - backend
-
 volumes:
   db_data:
   backend_logs:
-  frontend_logs:
-  frontend_dist:
 
 networks:
   ozon-network:
