@@ -5,7 +5,8 @@ set -e
 ### 0. Параметры запуска
 ### ================================
 
-BRANCH="${1:-master}"
+BRANCH_BACKEND="${1:-dev}"
+BRANCH_FRONTEND="${1:-dev}"
 CLEAN_IMAGES="${2:-yes}"
 
 ### ================================
@@ -35,7 +36,8 @@ FRONTEND_EXPORT_CONTAINER="ozon-helper-frontend-export"
 
 echo "=============================="
 echo "DEPLOY START: $(date)"
-echo "Branch: $BRANCH"
+echo "Branch backend: $BRANCH_BACKEND"
+echo "Branch frontend: $BRANCH_FRONTEND"
 echo "Backend tag: $BACKEND_TAG"
 echo "Clean old images: $CLEAN_IMAGES"
 echo "=============================="
@@ -48,17 +50,17 @@ echo "=============================="
 cd "$BACKEND_DIR"
 echo "[BACKEND] Обновляем репозиторий..."
 git fetch origin
-git reset --hard "origin/$BRANCH"
+git reset --hard "origin/$BRANCH_BACKEND"
 
 # Frontend
 if [ ! -d "$FRONTEND_DIR" ]; then
   echo "[FRONTEND] Клонируем $FRONTEND_REPO_URL..."
-  git clone -b "$BRANCH" "$FRONTEND_REPO_URL" "$FRONTEND_DIR"
+  git clone -b "$BRANCH_FRONTEND" "$FRONTEND_REPO_URL" "$FRONTEND_DIR"
 else
   echo "[FRONTEND] Обновляем репозиторий..."
   cd "$FRONTEND_DIR"
   git fetch origin
-  git reset --hard "origin/$BRANCH"
+  git reset --hard "origin/$BRANCH_FRONTEND"
 fi
 
 ### ================================
