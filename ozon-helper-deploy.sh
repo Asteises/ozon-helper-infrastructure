@@ -6,8 +6,8 @@ set -e
 ### ================================
 
 BRANCH_BACKEND="${1:-dev}"
-BRANCH_FRONTEND="${1:-dev}"
-CLEAN_IMAGES="${2:-yes}"
+BRANCH_FRONTEND="${2:-dev}"
+CLEAN_IMAGES="${3:-yes}"
 
 ### ================================
 ### 1. Пути и переменные
