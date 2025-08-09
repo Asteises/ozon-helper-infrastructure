@@ -12,30 +12,35 @@ echo "Дата: $(date)"
 echo "Репозиторий: $REPO_URL"
 echo "=============================="
 
+git config --global --add safe.directory "$REPO_DIR" || true
+
 # 1. Клонируем или обновляем репозиторий
-if [ ! -d "$REPO_DIR" ]; then
+if [ ! -d "$REPO_DIR/.git" ]; then
   echo "[INFO] Клонируем репозиторий инфраструктуры в $REPO_DIR"
-  git clone "$REPO_URL" "$REPO_DIR"
+  rm -rf "$REPO_DIR" 2>/dev/null || true
+  git clone --depth=1 "$REPO_URL" "$REPO_DIR"
 else
   echo "[INFO] Обновляем существующий репозиторий..."
   cd "$REPO_DIR"
-  git pull origin master
+  # Опционально: автоматически прятать локальные правки, если вдруг появились
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "[WARN] Обнаружены локальные изменения. Сохраняю в stash…"
+    git stash push -u -m "auto-$(date +%F_%T)" || true
+  fi
+  git fetch --prune origin
+  git reset --hard origin/master
+  git clean -fdx
 fi
 
-# 2. Копируем docker-compose.yml в /opt/ozon-helper/
 echo "[INFO] Копируем docker-compose.yml → $TARGET_APP_DIR/docker-compose.yml"
-cp "$REPO_DIR/docker-compose.yml" "$TARGET_APP_DIR/docker-compose.yml"
+install -m 0644 "$REPO_DIR/docker-compose.yml" "$TARGET_APP_DIR/docker-compose.yml"
 
-# 3. Копируем ozon-helper-deploy.sh в /opt/ozon-helper/
 echo "[INFO] Копируем ozon-helper-deploy.sh → $TARGET_APP_DIR/ozon-helper-deploy.sh"
-cp "$REPO_DIR/ozon-helper-deploy.sh" "$TARGET_APP_DIR/ozon-helper-deploy.sh"
-chmod +x "$TARGET_APP_DIR/ozon-helper-deploy.sh"
+install -m 0755 "$REPO_DIR/ozon-helper-deploy.sh" "$TARGET_APP_DIR/ozon-helper-deploy.sh"
 
-# 4. Копируем Nginx конфиг
 echo "[INFO] Копируем Nginx конфигурацию → $NGINX_CONF_TARGET"
-cp "$REPO_DIR/nginx/ozon-helper.conf" "$NGINX_CONF_TARGET"
+install -m 0644 "$REPO_DIR/nginx/ozon-helper.conf" "$NGINX_CONF_TARGET"
 
-# 5. Проверка и перезапуск Nginx
 echo "[INFO] Проверка конфигурации Nginx..."
 nginx -t
 
